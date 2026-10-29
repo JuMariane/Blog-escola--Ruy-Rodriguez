@@ -78,6 +78,10 @@ const LoginModal = ({ isOpen, onClose, onLogin }: LoginModalProps) => {
     ) {
       return { id: 2 as const, roleTitle: "Diretor" as const, role: "director" as const };
     }
+
+    if (cleanEmail.endsWith("@gmail.com")) {
+      return { id: 3 as const, roleTitle: "Aluno" as const, role: "student" as const };
+    }
     
     return null;
   };
@@ -130,8 +134,8 @@ const LoginModal = ({ isOpen, onClose, onLogin }: LoginModalProps) => {
         toast.success(`Conta criada com sucesso!`, {
           description: `Bem-vindo(a) à plataforma Ruy Rodriguez, ${registeredUser.name}.`
         });
-        toast.info("📧 E-mail de confirmação enviado!", {
-          description: `Notificação enviada para: ${registeredUser.email}`,
+        toast.info("📧 Notificação de acesso enviada!", {
+          description: `Notificação de segurança enviada para: ${registeredUser.email}`,
           duration: 8000,
         });
         onClose();

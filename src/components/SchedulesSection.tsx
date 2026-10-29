@@ -104,7 +104,7 @@ const SchedulesSection = () => {
                   <Moon className="w-4 h-4" /> Turno Vespertino / Noite
                 </div>
                 <div className="flex items-center gap-1 text-sm font-bold text-foreground/80">
-                  <Clock className="w-4 h-4 text-primary" /> 14h15 - 21h15
+                  <Clock className="w-4 h-4 text-primary" /> 14h30 - 21h30
                 </div>
               </div>
 

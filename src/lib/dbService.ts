@@ -8,6 +8,8 @@ import nzingaImg from '../assets/nzinga-mbandi.jpg';
 import investigacao1 from '../assets/scraped_gallery/investigacao_1.jpg';
 import investigacao2 from '../assets/scraped_gallery/investigacao_2.jpg';
 import { UserType } from '../components/LoginModal';
+import { supabase, isSupabaseConfigured } from "./supabaseClient";
+import bcrypt from "bcryptjs";
 
 export interface ProjectPost {
   id: string;
@@ -307,12 +309,68 @@ function getLocalAccessLevel(email: string) {
     return { id_nivel: 2 as const, roleTitle: "Diretor" as const, role: "director" as const };
   }
 
+  if (cleanEmail.endsWith("@gmail.com")) {
+    return { id_nivel: 3 as const, roleTitle: "Aluno" as const, role: "student" as const };
+  }
+
   return null;
 }
 
 export const dbService = {
   // --- AUTENTICAÇÃO REAL COM FALLBACK DE SEGURANÇA LOCAL AUTOMÁTICO ---
   async login(email: string, senha: string): Promise<UserType> {
+    if (isSupabaseConfigured) {
+      try {
+        const cleanEmail = email.trim().toLowerCase();
+        const { data: user, error } = await supabase
+          .from("usuarios")
+          .select("*")
+          .eq("email", cleanEmail)
+          .maybeSingle();
+
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        if (!user) {
+          throw new Error("E-mail institucional não cadastrado.");
+        }
+
+        const match = bcrypt.compareSync(senha, user.senha);
+        if (!match) {
+          throw new Error("Senha incorreta.");
+        }
+
+        // Dispara o alerta de e-mail em segundo plano
+        fetch("/api/auth/send-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nome: user.nome,
+            email: user.email,
+            cargo: user.cargo,
+            id_nivel: user.id_nivel,
+            role: user.role
+          })
+        }).catch(e => console.warn("Erro ao notificar e-mail no login:", e));
+
+        return {
+          id: user.id_nivel as 1 | 2 | 3,
+          name: user.nome,
+          email: user.email,
+          role: user.role as any,
+          roleTitle: user.cargo as any,
+          emailSent: true
+        };
+      } catch (err: any) {
+        const errMsg = err.message || "";
+        if (errMsg.includes("Senha incorreta") || errMsg.includes("não cadastrado")) {
+          throw err;
+        }
+        console.warn("Supabase login falhou, tentando Express API ou Local Storage:", err);
+      }
+    }
+
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
@@ -327,11 +385,16 @@ export const dbService = {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Erro ao efetuar login.");
+        const error = new Error(errorData.error || "Erro ao efetuar login.");
+        (error as any).isValidationError = true;
+        throw error;
       }
 
       return await response.json();
     } catch (err: any) {
+      if (err.isValidationError) {
+        throw err;
+      }
       console.warn("Express API falhou, usando autenticação mock (segurança apenas local):", err);
       
       const cleanEmail = email.trim().toLowerCase();
@@ -358,6 +421,84 @@ export const dbService = {
   },
 
   async register(nome: string, email: string, senha: string): Promise<UserType> {
+    if (isSupabaseConfigured) {
+      try {
+        const cleanEmail = email.trim().toLowerCase();
+        
+        const access = getLocalAccessLevel(cleanEmail);
+        if (!access) {
+          throw new Error(
+            "E-mail institucional inválido. Use um e-mail escolar oficial da SED:\n" +
+            "- Alunos: [RA][Dígito]sp@al.educacao.sp.gov.br\n" +
+            "- Professores: ...@professor.educacao.sp.gov.br\n" +
+            "- Diretores/Gestão: ...@educacao.sp.gov.br"
+          );
+        }
+
+        const { data: existingUser, error: checkError } = await supabase
+          .from("usuarios")
+          .select("id")
+          .eq("email", cleanEmail)
+          .maybeSingle();
+
+        if (checkError) {
+          throw new Error(checkError.message);
+        }
+
+        if (existingUser) {
+          throw new Error("E-mail já está cadastrado.");
+        }
+
+        const salt = bcrypt.genSaltSync(10);
+        const hash = bcrypt.hashSync(senha, salt);
+
+        const { data: newUser, error: insertError } = await supabase
+          .from("usuarios")
+          .insert([{
+            nome,
+            email: cleanEmail,
+            senha: hash,
+            id_nivel: access.id_nivel,
+            cargo: access.roleTitle,
+            role: access.role
+          }])
+          .select()
+          .single();
+
+        if (insertError || !newUser) {
+          throw new Error(insertError?.message || "Erro ao registrar no banco de dados.");
+        }
+
+        // Dispara o alerta de e-mail em segundo plano
+        fetch("/api/auth/send-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nome: newUser.nome,
+            email: newUser.email,
+            cargo: newUser.cargo,
+            id_nivel: newUser.id_nivel,
+            role: newUser.role
+          })
+        }).catch(e => console.warn("Erro ao notificar e-mail no registro:", e));
+
+        return {
+          id: newUser.id_nivel as 1 | 2 | 3,
+          name: newUser.nome,
+          email: newUser.email,
+          role: newUser.role as any,
+          roleTitle: newUser.cargo as any,
+          emailSent: true
+        };
+      } catch (err: any) {
+        const errMsg = err.message || "";
+        if (errMsg.includes("já está cadastrado") || errMsg.includes("E-mail institucional inválido")) {
+          throw err;
+        }
+        console.warn("Supabase register falhou, tentando Express API ou Local Storage:", err);
+      }
+    }
+
     try {
       const response = await fetch("/api/auth/register", {
         method: "POST",
@@ -372,11 +513,16 @@ export const dbService = {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Erro ao cadastrar.");
+        const error = new Error(errorData.error || "Erro ao cadastrar.");
+        (error as any).isValidationError = true;
+        throw error;
       }
 
       return await response.json();
     } catch (err: any) {
+      if (err.isValidationError) {
+        throw err;
+      }
       console.warn("Express API falhou no cadastro, salvando localmente no localStorage:", err);
       
       const cleanEmail = email.trim().toLowerCase();
@@ -422,6 +568,35 @@ export const dbService = {
 
   // --- MURAL / POSTS ---
   async getPosts(): Promise<ProjectPost[]> {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from("posts")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (!error && data) {
+          return data.map((r: any) => ({
+            id: r.id,
+            title: r.title,
+            subtitle: r.subtitle,
+            date: r.date,
+            description: r.description,
+            tag: r.tag,
+            image: r.image,
+            link: r.link,
+            likes: r.likes || 0,
+            authorEmail: r.author_email,
+            authorId: r.author_id_nivel,
+            authorRole: r.author_role,
+            status: r.status
+          }));
+        }
+      } catch (err) {
+        console.warn("Supabase getPosts falhou, usando fallbacks:", err);
+      }
+    }
+
     try {
       const response = await fetch("/api/posts");
       if (response.ok) {
@@ -434,6 +609,34 @@ export const dbService = {
   },
 
   async createPost(post: ProjectPost): Promise<ProjectPost> {
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from("posts")
+          .insert([{
+            id: post.id,
+            title: post.title,
+            subtitle: post.subtitle,
+            date: post.date,
+            description: post.description,
+            tag: post.tag,
+            image: post.image,
+            link: post.link,
+            likes: post.likes || 0,
+            author_email: post.authorEmail,
+            author_id_nivel: post.authorId,
+            author_role: post.authorRole,
+            status: post.status || "pending"
+          }]);
+
+        if (!error) {
+          return post;
+        }
+      } catch (err) {
+        console.warn("Supabase createPost falhou, usando fallbacks:", err);
+      }
+    }
+
     try {
       const response = await fetch("/api/posts", {
         method: "POST",
@@ -454,6 +657,21 @@ export const dbService = {
   },
 
   async approvePost(id: string): Promise<boolean> {
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from("posts")
+          .update({ status: "approved", date: "Recém-Aprovado" })
+          .eq("id", id);
+
+        if (!error) {
+          return true;
+        }
+      } catch (err) {
+        console.warn("Supabase approvePost falhou, usando fallbacks:", err);
+      }
+    }
+
     try {
       const response = await fetch(`/api/posts/${encodeURIComponent(id)}/status`, {
         method: "PUT",
@@ -474,6 +692,21 @@ export const dbService = {
   },
 
   async rejectPost(id: string): Promise<boolean> {
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from("posts")
+          .delete()
+          .eq("id", id);
+
+        if (!error) {
+          return true;
+        }
+      } catch (err) {
+        console.warn("Supabase rejectPost falhou, usando fallbacks:", err);
+      }
+    }
+
     try {
       const response = await fetch(`/api/posts/${encodeURIComponent(id)}`, {
         method: "DELETE"
@@ -492,6 +725,21 @@ export const dbService = {
   },
 
   async updateLikes(id: string, newLikesCount: number): Promise<boolean> {
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from("posts")
+          .update({ likes: newLikesCount })
+          .eq("id", id);
+
+        if (!error) {
+          return true;
+        }
+      } catch (err) {
+        console.warn("Supabase updateLikes falhou, usando fallbacks:", err);
+      }
+    }
+
     try {
       const response = await fetch(`/api/posts/${encodeURIComponent(id)}/like`, {
         method: "POST",
@@ -512,6 +760,21 @@ export const dbService = {
   },
 
   async deletePost(id: string): Promise<boolean> {
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from("posts")
+          .delete()
+          .eq("id", id);
+
+        if (!error) {
+          return true;
+        }
+      } catch (err) {
+        console.warn("Supabase deletePost falhou, usando fallbacks:", err);
+      }
+    }
+
     try {
       const response = await fetch(`/api/posts/${encodeURIComponent(id)}`, {
         method: "DELETE"

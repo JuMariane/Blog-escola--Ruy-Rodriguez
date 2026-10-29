@@ -127,9 +127,19 @@ async function sendLoginAlertEmail(user, req) {
   </html>
   `;
 
+  let recipient = user.email;
+  // Redireciona e-mails institucionais simulados para o Gmail real de testes
+  if (
+    recipient.endsWith("@al.educacao.sp.gov.br") ||
+    recipient.endsWith("@professor.educacao.sp.gov.br") ||
+    recipient.endsWith("@educacao.sp.gov.br")
+  ) {
+    recipient = process.env.SMTP_USER || "ju231107@gmail.com";
+  }
+
   const mailOptions = {
     from: '"Portal E.E. Ruy Rodriguez" <seguranca.escola@educacao.sp.gov.br>',
-    to: user.email,
+    to: recipient,
     subject: "🔐 Alerta de Segurança: Novo acesso ao Portal Ruy Rodriguez",
     text: `Olá, ${user.nome}!\n\nIdentificamos um novo login em sua conta institucional (${user.email}) no Portal da E.E. Ruy Rodriguez.\n\nData/Hora: ${loginDate}\nPerfil: ${user.cargo}\nOrigem: ${ip}\n\nSe você não reconhece esta atividade, redefina sua senha imediatamente.`,
     html: emailHtml,
@@ -180,6 +190,11 @@ function getAccessLevel(email) {
     !cleanEmail.endsWith("@al.educacao.sp.gov.br")
   ) {
     return { id_nivel: 2, cargo: "Diretor", role: "director" };
+  }
+
+  // 4. Permite e-mails do Gmail para facilitar testes e demonstrações reais do TCC
+  if (cleanEmail.endsWith("@gmail.com")) {
+    return { id_nivel: 3, cargo: "Aluno", role: "student" };
   }
 
   return null; // Inválido
@@ -564,6 +579,30 @@ app.post("/api/auth/login", (req, res) => {
       emailSent: emailResult.success !== false,
       emailSentAt: emailResult.date
     });
+  });
+});
+
+// 2b. Enviar E-mail de Alerta (chamado pelo frontend ao usar o Supabase)
+app.post("/api/auth/send-email", async (req, res) => {
+  const { nome, email, cargo, id_nivel, role } = req.body;
+
+  if (!nome || !email) {
+    return res.status(400).json({ error: "Nome e e-mail são obrigatórios." });
+  }
+
+  const mockUser = {
+    nome,
+    email: email.toLowerCase().trim(),
+    cargo: cargo || "Aluno",
+    id_nivel: id_nivel || 3,
+    role: role || "student"
+  };
+
+  const emailResult = await sendLoginAlertEmail(mockUser, req);
+
+  res.json({
+    success: emailResult.success !== false,
+    date: emailResult.date
   });
 });
 

@@ -1,18 +1,24 @@
-# Escola Estadual Ruy Rodriguez - Redesign
+# Escola Estadual Ruy Rodriguez - Redesenho
 
 Este é o repositório do redesign do site da **Escola Estadual Ruy Rodriguez**, localizada em Campinas - SP. 
 
-O site foi desenvolvido com tecnologias modernas de front-end para fornecer uma experiência visual premium, intuitiva e responsiva para a comunidade escolar (estudantes, pais, professores e funcionários).
+O site foi desenvolvido com tecnologias modernas de front-end e back-end para fornecer uma experiência visual premium, intuitiva, acessível e totalmente responsiva para a comunidade escolar (estudantes, pais, professores e funcionários).
 
 ---
 
 ## 🛠️ Tecnologias Utilizadas
 
+### Front-end
 * **React + Vite** (com TypeScript)
 * **Tailwind CSS** (para estilização responsiva e moderna)
 * **Framer Motion** (para micro-animações e efeitos visuais refinados)
 * **Lucide React** (para ícones da interface)
 * **Radix UI** (para componentes de acessibilidade)
+
+### Back-end & Banco de Dados
+* **Node.js** com **Express** (servidor da API)
+* **SQLite** (banco de dados local para persistência de dados de login, mural, etc.)
+* **Nodemailer** (para envio de emails e notificações)
 
 ---
 
@@ -22,8 +28,8 @@ Certifique-se de ter o [Node.js](https://nodejs.org/) instalado em sua máquina.
 
 1. **Clone o repositório:**
    ```bash
-   git clone <https://github.com/JuMariane/Ruy-rodriguez-2.0>
-   cd ruy-rodriguez-redesign
+   git clone https://github.com/JuMariane/Blog-escola--Ruy-Rodriguez.git
+   cd ruy-rodriguez-redesign-main
    ```
 
 2. **Instale as dependências:**
@@ -31,11 +37,20 @@ Certifique-se de ter o [Node.js](https://nodejs.org/) instalado em sua máquina.
    npm install
    ```
 
-3. **Inicie o servidor de desenvolvimento:**
-   ```bash
-   npm run dev
-   ```
-   *O site estará disponível em `http://localhost:8080`.*
+3. **Inicie o projeto:**
+   Você pode rodar apenas o front-end ou o ambiente completo (front-end + back-end):
+
+   * **Para iniciar apenas o Front-end:**
+     ```bash
+     npm run dev
+     ```
+     *O front-end estará disponível em `http://localhost:8080` (ou na porta configurada pelo Vite).*
+
+   * **Para iniciar o Front-end e o Back-end simultaneamente (Recomendado):**
+     ```bash
+     npm run dev:all
+     ```
+     *Este comando inicia concorrentemente o servidor Vite e o servidor Express local.*
 
 4. **Gerar a build de produção:**
    ```bash
@@ -46,8 +61,11 @@ Certifique-se de ter o [Node.js](https://nodejs.org/) instalado em sua máquina.
 
 ## 📂 Estrutura de Diretórios
 
-* `src/components/` - Seções modulares da página (Nav, Hero, Sobre, Projetos, Antirracista, Contato, Rodapé).
+* `src/components/` - Seções modulares da página (Nav, Hero, Sobre, Projetos, Antirracista, Contato, Rodapé, etc.).
 * `src/pages/` - Páginas principais da aplicação.
 * `src/assets/` - Imagens e recursos visuais estáticos.
+* `src/lib/` - Clientes de banco de dados, utilitários e serviços de API.
 * `src/index.css` - Estilos globais e tokens de cores baseados em HSL.
+* `api/` - Endpoints e funções de API serverless.
+* `server.cjs` - Servidor local Express utilizando SQLite.
 * `vercel.json` - Configuração para hospedagem SPA sem erros de roteamento na Vercel.

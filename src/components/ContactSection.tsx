@@ -32,7 +32,7 @@ const ContactSection = () => {
               icon: Clock,
               title: "Horário",
               info: "Fundamental (6º ao 9º): 07h00 às 14h00",
-              detail: "Ensino Médio: 14h15 às 21h15",
+              detail: "Ensino Médio: 14h30 às 21h30",
             },
             {
               icon: Phone,
