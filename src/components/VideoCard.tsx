@@ -4,7 +4,7 @@ import { Play, Pause, Volume2, VolumeX } from "lucide-react";
 
 const VideoCard = () => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
 
@@ -20,37 +20,20 @@ const VideoCard = () => {
   const opacity = useTransform(scrollYProgress, [0, 0.8], [0.7, 1]);
 
   const handlePlayPause = () => {
-    if (!iframeRef.current || !iframeRef.current.contentWindow) return;
+    if (!videoRef.current) return;
     if (isPlaying) {
-      iframeRef.current.contentWindow.postMessage(
-        JSON.stringify({ event: "command", func: "pauseVideo", args: "" }),
-        "*"
-      );
+      videoRef.current.pause();
       setIsPlaying(false);
     } else {
-      iframeRef.current.contentWindow.postMessage(
-        JSON.stringify({ event: "command", func: "playVideo", args: "" }),
-        "*"
-      );
+      videoRef.current.play().catch(() => {});
       setIsPlaying(true);
     }
   };
 
   const handleMuteToggle = () => {
-    if (!iframeRef.current || !iframeRef.current.contentWindow) return;
-    if (isMuted) {
-      iframeRef.current.contentWindow.postMessage(
-        JSON.stringify({ event: "command", func: "unMute", args: "" }),
-        "*"
-      );
-      setIsMuted(false);
-    } else {
-      iframeRef.current.contentWindow.postMessage(
-        JSON.stringify({ event: "command", func: "mute", args: "" }),
-        "*"
-      );
-      setIsMuted(true);
-    }
+    if (!videoRef.current) return;
+    videoRef.current.muted = !isMuted;
+    setIsMuted(!isMuted);
   };
 
   return (
@@ -63,14 +46,15 @@ const VideoCard = () => {
         }}
         className="relative w-full max-w-4xl aspect-video overflow-hidden shadow-elevated border border-border bg-black flex items-center justify-center"
       >
-        {/* Iframe do YouTube configurado como background video */}
-        <iframe
-          ref={iframeRef}
-          src="https://www.youtube.com/embed/j-QzD0tXQXc?autoplay=1&mute=1&controls=0&loop=1&playlist=j-QzD0tXQXc&playsinline=1&rel=0&enablejsapi=1"
-          title="Vídeo Institucional Ruy Rodriguez"
-          className="w-full h-full pointer-events-none scale-[1.3] object-cover absolute inset-0"
-          allow="autoplay; encrypted-media"
-          style={{ border: 0 }}
+        {/* Vídeo local institucional */}
+        <video
+          ref={videoRef}
+          src="/video-escola.mp4"
+          loop
+          muted={isMuted}
+          playsInline
+          autoPlay
+          className="w-full h-full object-cover"
         />
 
         {/* Overlay do player */}
